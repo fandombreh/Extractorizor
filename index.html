@@ -4,18 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Website File Extractor</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Load JSZip from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="styles.css"> <!-- Assuming your CSS is here -->
 </head>
 <body>
-    <div class="container">
-        <h1>Website File Extractor</h1>
-        <p>Enter a URL to extract all referenced files into a ZIP. Note: Works only for CORS-enabled resources.</p>
-        <input type="text" id="urlInput" placeholder="Enter URL (e.g., https://example.com)">
-        <button onclick="extractFiles()">Extract and Download ZIP</button>
-        <p id="status"></p>
+    <h1>Website File Extractor</h1>
+    <p>Enter a URL to extract all referenced files into a ZIP. c0ded by orion</p>
+    <input type="text" id="url-input" placeholder="Enter website URL">
+    <button onclick="extractFiles()">Extract and Download ZIP</button>
+    <div id="status"></div>
+    <div id="progress" style="display: none;">
+        <span id="progress-text">0%</span>
+        <div id="progress-bar" style="width: 0%;"></div>
     </div>
-    <script src="script.js"></script>
+    <script src="script.js"></script> <!-- Save the above JS as your-script.js -->
 </body>
 </html>
