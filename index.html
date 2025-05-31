@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL File Extractor</title>
+    <title>Website File Extractor</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>URL File Extractor</h1>
-        <p>Enter a URL to extract all referenced files into a ZIP. Note: Works only for CORS-enabled resources.</p>
+        <h1>Website File Extractor</h1>
+        <p>Enter a URL to extract all files from the website into a ZIP. Requires a server-side API to bypass CORS and crawl all resources.</p>
         <input type="text" id="urlInput" placeholder="Enter URL (e.g., https://example.com)">
         <button onclick="extractFiles()">Extract and Download ZIP</button>
         <p id="status"></p>
