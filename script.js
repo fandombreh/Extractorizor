@@ -7,11 +7,17 @@ async function extractFiles() {
         return;
     }
 
+    // Ensure URL starts with http:// or https://
+    let url = urlInput;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+    }
+
     status.textContent = 'Fetching resources...';
 
     try {
         // Fetch the HTML content of the URL
-        const response = await fetch(urlInput);
+        const response = await fetch(url, { mode: 'cors' });
         if (!response.ok) throw new Error('Failed to fetch URL');
         
         const html = await response.text();
@@ -24,25 +30,26 @@ async function extractFiles() {
         // Add the HTML content to the ZIP
         zip.file('index.html', html);
 
-        // Collect all src and href attributes (images, scripts, stylesheets)
+        // Collect all elements with src or href attributes
         const resources = [
-            ...doc.querySelectorAll('img[src]'),
-            ...doc.querySelectorAll('script[src]'),
-            ...doc.querySelectorAll('link[href][rel="stylesheet"]')
+            ...doc.querySelectorAll('[src]'), // Elements with src (img, script, video, audio, source, etc.)
+            ...doc.querySelectorAll('[href]')  // Elements with href (link, a, etc.)
         ];
 
         // Fetch each resource and add to ZIP
         for (const resource of resources) {
-            const url = resource.src || resource.href;
-            if (url) {
+            const resourceUrl = resource.src || resource.href;
+            if (resourceUrl && resourceUrl.startsWith('http')) {
                 try {
-                    const res = await fetch(url, { mode: 'cors' });
-                    if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+                    const res = await fetch(resourceUrl, { mode: 'cors' });
+                    if (!res.ok) throw new Error(`Failed to fetch ${resourceUrl}`);
                     const blob = await res.blob();
-                    const fileName = url.split('/').pop() || 'file';
-                    zip.file(fileName, blob);
+                    // Use URL pathname to maintain folder structure
+                    const urlObj = new URL(resourceUrl);
+                    const filePath = urlObj.pathname.split('/').slice(1).join('/') || 'file';
+                    zip.file(filePath, blob);
                 } catch (err) {
-                    console.warn(`Could not fetch ${url}: ${err.message}`);
+                    console.warn(`Could not fetch ${resourceUrl}: ${err.message}`);
                 }
             }
         }
