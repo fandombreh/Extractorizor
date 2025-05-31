@@ -1,12 +1,3 @@
-Since you already have the HTML and CSS and only need a JavaScript script to handle the file extraction into a ZIP while bypassing CORS restrictions without a backend, I'll provide an improved JavaScript script. Bypassing CORS in a browser is challenging because browsers enforce the Same-Origin Policy, but we can use techniques like a proxy service (e.g., a public CORS proxy) to fetch resources. Below is an optimized JavaScript script that improves your original code, handles large websites better, and attempts to bypass CORS using a proxy while staying client-side.
-
-javascript
-
-Copy
-// Ensure JSZip and FileSaver.js are loaded in your HTML
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
 async function extractFiles() {
     const urlInput = document.getElementById('urlInput').value.trim();
     const status = document.getElementById('status');
@@ -39,9 +30,33 @@ async function extractFiles() {
     }
 
     try {
-        // Use a CORS proxy to bypass restrictions
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-        const response = await fetch(corsProxy + url);
+        // Try multiple CORS proxies
+        const corsProxies = [
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?'
+        ];
+
+        let response;
+        let proxyUsed = false;
+        for (const proxy of corsProxies) {
+            try {
+                response = await fetch(proxy + url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (response.ok) {
+                    proxyUsed = true;
+                    break;
+                }
+            } catch {
+                console.warn(`Proxy ${proxy} failed, trying next...`);
+            }
+        }
+
+        // Fallback to direct fetch if all proxies fail
+        if (!response || !response.ok) {
+            response = await fetch(url);
+            proxyUsed = false;
+        }
+
         if (!response.ok) throw new Error(`Failed to fetch URL: ${response.statusText}`);
 
         const html = await response.text();
@@ -51,10 +66,10 @@ async function extractFiles() {
         const zip = new JSZip();
         zip.file('index.html', html);
 
-        // Collect unique resource URLs
+        // Collect resource URLs
         const resources = [
             ...doc.querySelectorAll('img[src], script[src], link[href], video[src], audio[src], source[src], iframe[src]'),
-            ...doc.querySelectorAll('a[href$=".css"], a[href$=".js"], a[href$=".png"], a[href$=".jpg"], a[href$=".jpeg"], a[href$=".gif"], a[href$=".svg"]')
+            ...doc.querySelectorAll('a[href$=".css"], a[href$=".js"], a[href$=".png"], a[href$=".jpg"], a[href$=".jpeg"], a[href$=".gif"], a[href$=".svg"], a[href$=".woff"], a[href$=".woff2"], a[href$=".ttf"]')
         ].map(el => el.src || el.href).filter(url => url && (url.startsWith('http') || url.startsWith('/')));
 
         // Resolve relative URLs
@@ -79,13 +94,26 @@ async function extractFiles() {
             }
         };
 
-        // Fetch resource with retry logic
+        // Fetch resource with retry logic and proxy fallback
         const fetchResource = async (resourceUrl, retries = 2) => {
+            let res;
+            let currentProxy = proxyUsed ? corsProxies[0] : ''; // Use first successful proxy or none
             try {
-                // Try with proxy first
-                let res = await fetch(corsProxy + resourceUrl);
+                // Try with proxy or direct based on initial success
+                res = await fetch(currentProxy + resourceUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!res.ok && retries > 0) {
-                    // Retry without proxy if proxy fails
+                    // Try other proxies
+                    for (const proxy of corsProxies) {
+                        try {
+                            res = await fetch(proxy + resourceUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                            if (res.ok) break;
+                        } catch {
+                            continue;
+                        }
+                    }
+                }
+                if (!res.ok && retries > 0) {
+                    // Fallback to direct fetch
                     res = await fetch(resourceUrl);
                 }
                 if (!res.ok) throw new Error(`Failed to fetch ${resourceUrl}`);
@@ -93,12 +121,13 @@ async function extractFiles() {
                 const blob = await res.blob();
                 let filePath = new URL(resourceUrl).pathname.split('/').slice(1).join('/') || 'file';
                 const contentType = res.headers.get('content-type') || '';
-                
-                // Assign file extension based on content type
+
+                // Assign file extension
                 if (!filePath.includes('.')) {
                     const ext = contentType.includes('javascript') ? '.js' :
                                 contentType.includes('css') ? '.css' :
-                                contentType.includes('image') ? `.${contentType.split('/')[1] || 'bin'}` : '.bin';
+                                contentType.includes('image') ? `.${contentType.split('/')[1] || 'bin'}` :
+                                contentType.includes('font') ? `.${contentType.split('/')[1] || 'bin'}` : '.bin';
                     filePath += ext;
                 }
 
@@ -115,7 +144,7 @@ async function extractFiles() {
         };
 
         // Fetch resources in parallel with concurrency limit
-        const concurrencyLimit = 10;
+        const concurrencyLimit = 8;
         for (let i = 0; i < uniqueResources.length; i += concurrencyLimit) {
             const batch = uniqueResources.slice(i, i + concurrencyLimit);
             await Promise.all(batch.map(resourceUrl => fetchResource(resourceUrl)));
@@ -123,7 +152,7 @@ async function extractFiles() {
 
         // Generate and download ZIP
         status.textContent = 'Generating ZIP...';
-        const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+        const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
         saveAs(content, 'website_files.zip');
         status.textContent = 'Download started!';
     } catch (err) {
