@@ -1,3 +1,7 @@
+// Ensure JSZip is loaded in your HTML
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+// Optionally include FileSaver.js: <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
 async function extractFiles() {
     const urlInput = document.getElementById('urlInput').value.trim();
     const status = document.getElementById('status');
@@ -51,7 +55,7 @@ async function extractFiles() {
             }
         }
 
-        // Fallback to direct fetch if all proxies fail
+        // Fallback to direct fetch
         if (!response || !response.ok) {
             response = await fetch(url);
             proxyUsed = false;
@@ -97,12 +101,10 @@ async function extractFiles() {
         // Fetch resource with retry logic and proxy fallback
         const fetchResource = async (resourceUrl, retries = 2) => {
             let res;
-            let currentProxy = proxyUsed ? corsProxies[0] : ''; // Use first successful proxy or none
+            let currentProxy = proxyUsed ? corsProxies[0] : '';
             try {
-                // Try with proxy or direct based on initial success
                 res = await fetch(currentProxy + resourceUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!res.ok && retries > 0) {
-                    // Try other proxies
                     for (const proxy of corsProxies) {
                         try {
                             res = await fetch(proxy + resourceUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -113,7 +115,6 @@ async function extractFiles() {
                     }
                 }
                 if (!res.ok && retries > 0) {
-                    // Fallback to direct fetch
                     res = await fetch(resourceUrl);
                 }
                 if (!res.ok) throw new Error(`Failed to fetch ${resourceUrl}`);
@@ -134,7 +135,7 @@ async function extractFiles() {
                 zip.file(filePath, blob);
             } catch (err) {
                 if (retries > 0) {
-                    return fetchResource(resourceUrl, retries - 1); // Retry
+                    return fetchResource(resourceUrl, retries - 1);
                 }
                 console.warn(`Could not fetch ${resourceUrl}: ${err.message}`);
             } finally {
@@ -153,7 +154,20 @@ async function extractFiles() {
         // Generate and download ZIP
         status.textContent = 'Generating ZIP...';
         const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
-        saveAs(content, 'website_files.zip');
+
+        // Fallback download if saveAs is unavailable
+        if (typeof saveAs === 'function') {
+            saveAs(content, 'website_files.zip');
+        } else {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = 'website_files.zip';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
         status.textContent = 'Download started!';
     } catch (err) {
         status.textContent = `Error: ${err.message}`;
